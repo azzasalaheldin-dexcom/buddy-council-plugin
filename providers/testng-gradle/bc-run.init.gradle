@@ -1,0 +1,34 @@
+// Registers `bcRunSuite` so /bc:automate can run one TestNG suite without editing the framework's build files.
+// Usage: ./gradlew --init-script bc-run.init.gradle bcRunSuite -PbcSuite=<suite.xml> [-PbcPropsFile=<file>] [-PbcSysProps="k=v;k=v"]
+rootProject {
+    pluginManager.withPlugin('java') {
+        def suite = project.findProperty('bcSuite')
+        def propsFile = project.file(project.findProperty('bcPropsFile') ?: 'execution.properties')
+        def sysProps = (project.findProperty('bcSysProps') ?: '').toString()
+
+        tasks.register('bcRunSuite', Test) {
+            group = 'verification'
+            description = 'Runs a single TestNG suite XML (registered by Buddy-Council).'
+            outputs.upToDateWhen { false }
+            useTestNG {
+                if (suite) {
+                    suites suite.toString()
+                }
+            }
+            doFirst {
+                if (!suite) {
+                    throw new GradleException('bcRunSuite needs -PbcSuite=<path to suite xml>')
+                }
+                if (propsFile.exists()) {
+                    def props = new Properties()
+                    propsFile.withInputStream { props.load(it) }
+                    props.each { k, v -> systemProperty k.toString(), v.toString() }
+                }
+                sysProps.split(';').findAll { it.contains('=') }.each { pair ->
+                    def kv = pair.split('=', 2)
+                    systemProperty kv[0].trim(), kv[1].trim()
+                }
+            }
+        }
+    }
+}

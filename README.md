@@ -28,6 +28,8 @@ Data is fetched live from external systems via MCP — no RAG, no embeddings, no
 | `/bc:ask` | Ask a natural-language question about requirements and test cases — routes to the right analysis or answers directly |
 | `/bc:onboarding` | Walk a new team member through the product feature-by-feature with paced demos, optional code mapping, and an assessment. Resumes across sessions |
 | `/bc:codemap "<feature>"` | Map a feature to where it lives in the current codebase: files, communication flow, and per-requirement locations |
+| `/bc:automate <case>` | Automate a TestRail test case — fetch it by link or ID and write the test script in your automation framework following that framework's own conventions, then compile it. Run it with /bc:run-automation |
+| `/bc:run-automation <case>...` | Run automated tests for TestRail cases in your automation framework — find the test linked to each case, check the machine and device are ready, run it, and report the result |
 | `/bc:vnv-sprint-prep` | V&V (Validation and Verification) sprint preparation — check cross-platform parity on the dev board, clone sprint stories to the V&V board, validate them against requirements and test cases, drive them through scenario review, and write the approved scenarios into TestRail as test cases |
 
 These descriptions are the `description:` frontmatter in `commands/*.md` — the same text both CLIs show in their `/` menus. Keep the table and the frontmatter in sync when either changes.
@@ -453,6 +455,69 @@ Walks through the product feature by feature — paced demos with do/don't pairs
 ```
 
 Same code mapping as the onboarding phase, standalone: the feature's files, communication flow, and per-requirement locations in the current repo.
+
+### Automate a Test Case
+
+```
+/bc:automate https://<instance>.testrail.io/index.php?/cases/view/2926799
+/bc:automate C2926799 --repo ~/code/MyAutomation    # use/record a specific checkout
+/bc:automate C2926799 --dry-run                     # plan + diff only
+```
+
+Fetches the case from TestRail, finds the automation framework on **this** machine, maps each TestRail step
+to the framework's existing page objects and step methods, writes the test after one confirmation, and
+compiles it. It does not run the test. Steps with no matching code get a `BC_TODO_LOCATOR` placeholder and the test is
+tagged with the framework's in-progress group, so it never breaks a suite run. It never commits or pushes.
+
+Nothing about the framework's location is hardcoded, so it works on any laptop. The checkout is resolved
+from `--repo`, then `$BC_AUTOMATION_ROOT`, then the cached `automation.framework_root`, then the current
+directory, then common clone folders (`~/Documents/GitHub`, `~/src`, `~/code`, …) — each matched by its git
+`origin` against `automation.repo_url` — and finally offers to clone it. Configure it in `sources.json`:
+
+```json
+"automation": {
+  "repo_url": "https://github.com/your-org/your-automation-framework",
+  "provider": "auto",
+  "default_platform": "Android",
+  "branch_prefix": "automation/"
+}
+```
+
+Supported frameworks: **TestNG + Gradle** (`providers/testng-gradle/`).
+
+### Run Automated Tests
+
+```
+/bc:run-automation C2926799                         # by case ID or TestRail link
+/bc:run-automation C2926799 C2926800 --platform iOS # several cases in one run
+```
+
+Finds the test linked to each case in the framework (by its case-id naming), checks readiness, runs them
+in one run, and reports PASSED/FAILED/SKIPPED per case with a failure class (placeholder, locator,
+assertion, environment).
+
+**Device farm gate.** When `automation.device_farm` is configured, nothing runs until the farm is up and the
+phone connected to your machine is listed on `<farm url>/nodes` with status FREE (the green ✅). If the farm
+isn't running, the command offers to start it from its checkout (located like the framework: cached
+`device_farm.root`, `$BC_DEVICE_FARM_ROOT`, common clone folders matched by `device_farm.repo_url`, or a
+clone) with `start_command`, and waits for it. A device that is missing triggers one `/updateDevices`
+re-scan; a device that is ❌ IN_USE stops the run — it offers `/free/<id>` only if you confirm the lock is
+stale, and never calls `/freeAll` or stops the farm.
+
+```json
+"device_farm": {
+  "url": "http://localhost:7890",
+  "repo_url": "https://github.com/your-org/your-device-farm",
+  "start_command": "./startup-local-async.sh",
+  "log_file": "localLogFile.txt"
+}
+```
+
+A single test is run through a
+plugin-shipped Gradle init script (`bcRunSuite`), so the framework's build files are never edited. Running
+needs the framework's own per-machine setup (JDK, repository credentials in `~/.gradle/gradle.properties`,
+its gitignored run config, a connected device/emulator); missing pieces are reported as `Readiness:` lines
+with the fix.
 
 > **Data Contract:** every analysis command fetches every configured source — requirements and test cases always, plus GitHub doc enrichment when configured — and prints visible `Fetch:`/`Readiness:`/`Enrichment:` lines before analyzing. If any source fails, it stops and asks whether to continue with partial data. See [Debugging a bc run](#debugging-a-bc-run).
 

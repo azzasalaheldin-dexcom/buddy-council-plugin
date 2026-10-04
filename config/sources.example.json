@@ -56,5 +56,19 @@
       }
     },
     "pending": false
+  },
+  "automation": {
+    "repo_url": "https://github.com/your-org/your-automation-framework",
+    "framework_root": null,
+    "provider": "auto",
+    "default_platform": "Android",
+    "branch_prefix": "automation/",
+    "device_farm": {
+      "url": "http://localhost:7890",
+      "repo_url": "https://github.com/your-org/your-device-farm",
+      "root": null,
+      "start_command": "./startup-local-async.sh",
+      "log_file": "localLogFile.txt"
+    }
   }
 }
