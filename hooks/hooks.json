@@ -24,6 +24,17 @@
         ]
       },
       {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/auto-approve-automation-reads.sh",
+            "description": "Auto-approve reads inside the plugin, the project, and the recorded automation framework / device-farm checkouts; credential files still prompt",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit",
         "hooks": [
           {

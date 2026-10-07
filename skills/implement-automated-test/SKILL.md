@@ -68,7 +68,8 @@ how the reference test holds its data.
 
 ### Step 5: Generate
 
-Follow the provider's **Test template** exactly — naming, annotations, case-id linkage, groups, description.
+Follow the provider's **Test template** exactly — naming, annotations, case-id linkage, groups, description,
+and the call style (e.g. a single fluent chain with no page-object local variables).
 Keep each TestRail step visible in the code as a one-line comment `// Step <n>: <short action>` above its
 calls, so a reviewer can trace code back to the case.
 

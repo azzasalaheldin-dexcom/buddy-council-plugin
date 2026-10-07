@@ -47,6 +47,8 @@ case "$FILE" in
     allow "bc: onboarding progress log" ;;
   "$HOME/.buddy-council/secrets.json")
     allow "bc: plugin secrets file" ;;
+  */build/bc/run-*.xml)
+    allow "bc: generated one-run TestNG suite (gitignored build dir)" ;;
 esac
 
 # MCP config is security-relevant (it defines which servers run), so only the

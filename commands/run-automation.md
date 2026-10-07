@@ -22,10 +22,17 @@ any laptop.
 
 - **Cases** (required): one or more TestRail case URLs, `C<id>`, `TC-<id>`, or bare numbers.
 - **Flags**:
-  - `--platform <name>`: platform to run on (e.g. `Android`, `iOS`). Default: `automation.default_platform`; ask if neither is set.
+  - `--platform <name>`: platform to run on (e.g. `Android`, `iOS`). Default: `automation.default_platform`, then the last run's platform; ask only if none is known.
   - `--repo <path>`: framework checkout to use. Validated and recorded as `automation.framework_root`.
 
 ## Execution
+
+**Ask as little as possible.** Every answer the user has already given lives in `.buddy-council/sources.json`
+(`automation.default_platform`, `automation.run_memory`, `automation.device_farm.auto_start`) — read it first
+and never ask a question it already answers. Keep shell commands to the plain read-only forms the skills
+show (`grep`, `cat`, `git -C … status`, `adb devices`, `curl -s <farm url>/…`, `sleep N`, `./gradlew …`);
+those are auto-approved by the plugin's hooks. Python heredocs, `for` loops, and redirects to files are not,
+and each one costs the user a permission prompt.
 
 1. Verify `.buddy-council/sources.json` exists. If not: tell the user to run `/bc:setup` first.
 2. Parse every case argument into a numeric id (for a URL, the digits after `cases/view/`).
@@ -34,7 +41,8 @@ any laptop.
 4. Find each case's test: search the framework's test sources for the provider profile's `linkage` pattern
    with the id (e.g. `TC#<id>_`), then the bare id as a whole word inside a test annotation.
    - **One match** → record its fully qualified class and method.
-   - **Several matches** → list them and ask which to run.
+   - **Several matches** → use `automation.run_memory.tests["<id>"]` if it is one of them; otherwise list them,
+     ask which to run, and remember the answer there.
    - **None** → `C<id>: no automated test found — write it with /bc:automate C<id>`. Run the remaining cases;
      stop if none are left.
    Print `Found: C<id> → <relative/path/TestClass.java>#<method>` for each.
@@ -50,7 +58,9 @@ any laptop.
    ```
 7. Follow `${CLAUDE_PLUGIN_ROOT}/skills/run-automated-test/SKILL.md` with all found tests in **one** run
    (one generated suite, one Gradle invocation).
-8. Report one line per case, then the artifacts:
+8. Report one line per case, then the artifacts. Then save what this run settled to
+   `automation.run_memory` (merge, never drop keys): `{platform, device_id, tests: {"<id>": "<fqcn>#<method>"}}`.
+   If `automation.default_platform` was empty, set it to the platform used.
 
 ```
 C2926799  PASSED   12m04s

@@ -101,6 +101,13 @@ if echo "$FIRST_LINE" | grep -qE '^[[:space:]]*(pip3?|python3?[[:space:]]+-m[[:s
   allow "bc: dependency setup"
 fi
 
+# (g) /bc:automate and /bc:run-automation: read-only inspection, device/farm probes,
+#     and the two Gradle tasks the workflow runs. Every chained segment must qualify.
+AUTOMATION_VERDICT=$(python3 "$(dirname "$0")/automation_allowlist.py" "$COMMAND" 2>/dev/null)
+if [ "$AUTOMATION_VERDICT" = "allow" ]; then
+  allow "bc: automation read-only/probe/run command"
+fi
+
 # ---------------------------------------------------------------------------
 # 3. Everything else — defer to the normal permission prompt.
 # ---------------------------------------------------------------------------

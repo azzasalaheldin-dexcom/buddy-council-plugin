@@ -17,6 +17,12 @@
       },
       {
         "type": "command",
+        "bash": "\"${COPILOT_PLUGIN_ROOT:-.}\"/hooks/auto-approve-automation-reads.sh",
+        "matcher": "view|grep|glob",
+        "timeoutSec": 10
+      },
+      {
+        "type": "command",
         "bash": "\"${COPILOT_PLUGIN_ROOT:-.}\"/hooks/auto-approve-mcp.sh",
         "timeoutSec": 10
       }

@@ -62,6 +62,11 @@ public void <methodName>() {
   any step is a placeholder. Never add a new group constant without asking.
 - **Annotations**: copy capability/environment annotations (`@DesiredCapability`, `@Transmitter`,
   `@BluetoothEnabled`, `@Simulated`, …) only from a reference test with the same kind of flow.
+- **Fluent chain, no page-object locals**: write the flow as one `new FirstPage(getAppiumDriver())…` chain
+  where each call returns the next page. Never declare page-object variables (`SetupPage setupPage = …`).
+  When an existing method in the path returns `void`, change it to return `this` (or the page it lands on) —
+  existing callers still compile — and list that edit in the plan. Start a new statement only where the
+  reference test does (e.g. a shared-steps helper that doesn't return a page).
 - **Assertions**: use the framework's mechanism — page-object verify methods first, then the soft-assert
   helper on the page base class, then TestNG `Assert`. If the framework uses a shared soft-assert, end the
   test with whatever the reference test uses to flush it.
@@ -93,7 +98,7 @@ The placeholder token is **`BC_TODO_LOCATOR`**. Use only the locator annotations
 |---|---|---|
 | JDK | `java -version` matches `java_version` (major) | Install that JDK and point `JAVA_HOME` at it |
 | Wrapper | `gradlew` (or `gradlew.bat` on Windows) exists and is executable | `chmod +x gradlew` |
-| Repo credentials | each `credential_props` name has a non-empty value in `~/.gradle/gradle.properties`, the project `gradle.properties`, or `ORG_GRADLE_PROJECT_<name>` env | Add it to `~/.gradle/gradle.properties` (per-user, outside the repo) |
+| Repo credentials | each `credential_props` name has a non-empty value: `grep -c '^<name>=.' ~/.gradle/gradle.properties <root>/gradle.properties` (counts only), or `ORG_GRADLE_PROJECT_<name>` is set | Add it to `~/.gradle/gradle.properties` (per-user, outside the repo) |
 
 **Never print credential values** — report each property as `set` or `missing` only.
 
@@ -124,7 +129,10 @@ Compile errors are reported as `path:line: message`; match them against the file
 Do **not** edit `build.gradle`/`tests.gradle` and do not use the framework's suite-wide tasks. Instead:
 
 1. Write the suite to `build/bc/run-<UTC timestamp>.xml` (`build/` is gitignored, so nothing is left in git),
-   with one `<class>` entry per test (group methods of the same class under one `<class>`):
+   with one `<class>` entry per test (group methods of the same class under one `<class>`). Put the timestamp
+   in the filename **literally** (e.g. `run-20261004T144000Z.xml`) — no `$(date …)` or shell variables, which
+   force a permission prompt. Write it with the file tool, or `mkdir -p build/bc && cat > build/bc/run-<ts>.xml
+   <<'EOF' … EOF` (quoted delimiter); both are auto-approved:
 
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
@@ -156,11 +164,13 @@ Do **not** edit `build.gradle`/`tests.gradle` and do not use the framework's sui
    ```
 
    `<plugin_root>`: `${CLAUDE_PLUGIN_ROOT}`, else `$COPILOT_PLUGIN_ROOT`, else `plugin_root` from
-   `sources.json` — use the first that exists on disk.
+   `sources.json` — use the first that exists on disk. Pass `JAVA_HOME` as a literal path or
+   `$(/usr/libexec/java_home -v <n>)`; never read paths from temp files with `$(cat …)`.
 
 ## Results
 
-- JUnit XML: `build/test-results/bcRunSuite/TEST-*.xml` — map each `<testcase classname name>` back to its
+- JUnit XML: `build/test-results/bcRunSuite/TEST-*.xml` (list them with
+  `find build/test-results/bcRunSuite -name 'TEST-*.xml' -newer build/bc/run-<ts>.xml | xargs grep -h '<testcase'`) — map each `<testcase classname name>` back to its
   case id, and read its `time` and first `<failure>`/`<error>` message and stack frame. A requested test with
   no `<testcase>` entry did not run — report it as SKIPPED.
 - If that directory is empty, the build failed before tests ran — report the Gradle error instead.

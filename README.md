@@ -504,6 +504,12 @@ clone) with `start_command`, and waits for it. A device that is missing triggers
 re-scan; a device that is ❌ IN_USE stops the run — it offers `/free/<id>` only if you confirm the lock is
 stale, and never calls `/freeAll` or stops the farm.
 
+**Fewer questions on repeat runs.** Answers are remembered in `sources.json`: the platform and device used
+(`automation.run_memory`), which test to run when a case matches several, and — if you answer **always** when
+asked to start the farm — `device_farm.auto_start: true`. The read-only commands the run uses are
+auto-approved by the plugin's hooks (see [Security](#security)), so a normal run prompts only for starting
+the farm the first time.
+
 ```json
 "device_farm": {
   "url": "http://localhost:7890",
@@ -532,7 +538,7 @@ Command → Agent → Skills (fetch → normalize → analyze) → Report
 - **Skills** — reusable capabilities (fetching, normalization, analysis)
 - **Providers** — platform-specific data fetching (TestRail, Excel, Jama, GitHub)
 - **MCP Servers** — wrap external APIs with structured tool interfaces. The **vendored** ones under `mcp-servers/` (TestRail, Jama) are `uv` projects with a committed `uv.lock`, so every machine resolves the identical dependency set; after changing a server's `pyproject.toml`, re-run `uv lock --directory mcp-servers/<name>` and commit the updated lock. Jira/Confluence and GitHub are **not** vendored — they use the vendors' own servers (Atlassian's hosted remote server, and `github-mcp-server`)
-- **Hooks** — dual-manifest: `hooks/hooks.json` (Claude Code) and the plugin-root `hooks.json` (Copilot CLI) register the same four runtime-agnostic scripts
+- **Hooks** — dual-manifest: `hooks/hooks.json` (Claude Code) and the plugin-root `hooks.json` (Copilot CLI) register the same five runtime-agnostic scripts
 
 Agents never call providers directly — they go through router skills, which read the config and delegate to the correct provider. This means adding a new platform (e.g., Jira, Qase) only requires adding a `providers/<name>/` folder and updating the router.
 
@@ -551,6 +557,8 @@ See [docs/architecture.md](docs/architecture.md) for the full architecture docum
 - Bundled hooks run on **both runtimes** (Claude Code loads `hooks/hooks.json`; Copilot CLI loads the plugin-root `hooks.json` — same scripts). If a Copilot version still prompts for MCP reads, the `--allow-tool` recipe under [Installation](#copilot-cli--fewer-permission-prompts) covers the gap:
   - a PreToolUse hook hard-blocks destructive Bash commands (`rm -rf`, `kill`, `git push --force`, etc.)
   - the same hook **auto-approves** the plugin's curated read-only operations (the Excel parser, `gh api` reads, `jq`, the TestRail connection test, and read-only MCP fetches)
+  - for `/bc:automate` and `/bc:run-automation` it also auto-approves (via `hooks/automation_allowlist.py`) read-only inspection (`grep`, `cat`, `sed -n`, `find` without `-exec`/`-delete`, read-only `git`), device probes (`adb devices`/`getprop`, `idevice_id`, `xcrun … list`), `curl` GETs to `localhost` **except** `/free` and `/freeAll`, short `sleep`s, `xargs` over those read-only commands, and `./gradlew` limited to `compileTestJava`/`bcRunSuite` through the plugin's own init script (or a byte-identical copy in another install of the plugin). Writing the one-run suite file `build/bc/run-<ts>.xml` (via a quoted heredoc, plus `mkdir -p build/bc`) is also approved. Every chained segment must qualify; subshells, heredocs, backgrounding, and file redirects always prompt, and credential files (`secrets.json`, `gradle.properties`, `.env`, keys) may only be presence-checked with `grep -q/-c`
+  - a read hook auto-approves file views inside the plugin, the project, and the checkouts recorded as `automation.framework_root` / `automation.device_farm.root` — credential files still prompt
   - a second PreToolUse hook auto-approves writes **only** to the plugin's own generated files (`.buddy-council/` config and progress log, `~/.buddy-council/secrets.json`, the plugin's own `.mcp.json`) — all other writes still prompt
   - a PostToolUse hook writes the redacted tool log described under [Debugging a bc run](#debugging-a-bc-run) — metadata only, credentials masked, never file contents or responses
 
